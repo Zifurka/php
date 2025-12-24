@@ -1,61 +1,61 @@
 <?php
-declare(strict_types=1);
+// Проверяем, есть ли уже информация о куках в URL
+$cookieCheck = isset($_GET['cookie_status']) ? $_GET['cookie_status'] : null;
 
-/*
-ЗАДАНИЕ 1
-- Инициализируйте переменную для подсчета количества посещений
-- Если соответствующие данные передавались через куки — сохраняйте их в эту переменную 
-- Нарастите счетчик посещений
-- Инициализируйте переменную для хранения значения последнего посещения страницы
-- Если соответствующие данные передавались из куки, отфильтруйте их и сохраните в эту переменную.
-  Для фильтрации используйте функции trim(), htmlspecialchars()
-- С помощью функции setcookie() установите соответствующие куки. Задайте время хранения куки 1 сутки. 
-  Для задания времени последнего посещения страницы используйте функцию date()
-*/
-
-// Инициализация счётчика посещений
-$visits = 1;
-if (isset($_COOKIE['visits']) && is_numeric($_COOKIE['visits'])) {
-    $visits = (int)$_COOKIE['visits'] + 1;
+if ($cookieCheck === null && !isset($_COOKIE['visit_count'])) {
+    // Пытаемся поставить тестовую куку
+    setcookie('test_cookie', '1', time() + 3600, '/');
+    // Перезагружаем страницу, чтобы проверить, пришла ли она обратно
+    $url = strtok($_SERVER["REQUEST_URI"], '?');
+    header("Location: " . $url . "?cookie_status=checking");
+    exit;
 }
 
-// Инициализация даты последнего посещения
-$lastVisit = '';
-if (isset($_COOKIE['last_visit'])) {
-    // Фильтрация согласно заданию: trim() + htmlspecialchars()
-    $lastVisit = htmlspecialchars(trim($_COOKIE['last_visit']));
-}
+// Определяем, работают ли куки
+$cookiesEnabled = isset($_COOKIE['test_cookie']) || isset($_COOKIE['visit_count']);
 
-// Устанавливаем куки на 1 сутки (86400 секунд)
-$expire = time() + 86400;
-setcookie('visits', (string)$visits, $expire, '/');
-setcookie('last_visit', date('d-m-Y H:i:s'), $expire, '/');
+$currentDateTime = date('d-m-Y H:i:s');
+
+if ($cookiesEnabled) {
+    $visitCount = isset($_COOKIE['visit_count']) ? (int)$_COOKIE['visit_count'] + 1 : 1;
+    $lastVisit = isset($_COOKIE['last_visit']) ? $_COOKIE['last_visit'] : '';
+    
+    setcookie('visit_count', $visitCount, strtotime('+1 day'), '/');
+    setcookie('last_visit', $currentDateTime, strtotime('+1 day'), '/');
+} else {
+    // КУКИ ВЫКЛЮЧЕНЫ — РАБОТАЕМ ЧЕРЕЗ ФАЙЛЫ (FINGERPRINT)
+    $fingerprint = md5($_SERVER['REMOTE_ADDR'] . $_SERVER['HTTP_USER_AGENT']);
+    $storageFile = __DIR__ . "/data_" . $fingerprint . ".txt";
+
+    if (file_exists($storageFile)) {
+        $fileData = explode('|', file_get_contents($storageFile));
+        $visitCount = (int)$fileData[0] + 1;
+        $lastVisit = $fileData[1];
+    } else {
+        $visitCount = 1;
+        $lastVisit = '';
+    }
+    file_put_contents($storageFile, $visitCount . '|' . $currentDateTime);
+}
 ?>
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-	<meta charset="UTF-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Последний визит</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Последний визит</title>
 </head>
 <body>
+    <h1>Последний визит</h1>
 
-<h1>Последний визит</h1>
-
-<?php
-/*
-ЗАДАНИЕ 2
-- Выводите информацию о количестве посещений и дате последнего посещения
-*/
-if ($visits === 1) {
-    echo "<p>Добро пожаловать!</p>";
-} else {
-    echo "<p>Вы зашли на страницу {$visits} раз.</p>";
-    echo "<p>Последнее посещение: {$lastVisit}</p>";
-}
-?>
-
+    <?php
+    if ($visitCount == 1) {
+        echo 'Добро пожаловать!';
+    } else {
+        echo 'Вы зашли на страницу ' . $visitCount . ' раз' . '<br>';
+        echo 'Последнее посещение: ' . $lastVisit;
+    }
+    ?>
 </body>
 </html>
