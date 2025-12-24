@@ -60,6 +60,6 @@ class User
      */
     public function __destruct()
     {
-        echo "Пользователь {$this->login} удален.<br>";
+        echo "<div class='destruct-message'>Пользователь {$this->login} удалён.</div>";
     }
 }
